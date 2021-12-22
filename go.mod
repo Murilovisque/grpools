@@ -1,3 +1,3 @@
-module github.com/Murilovisque/pools
+module github.com/Murilovisque/grpools
 
 go 1.17
