@@ -11,7 +11,7 @@ var (
 	mapValues sync.Map
 )
 
-func TestPoolShouldIncrementGettingFromFor(t *testing.T) {
+func TestPoolShouldIncrementGettingFromCopyValue(t *testing.T) {
 	setup()
 	const expectedResult = 100000
 	var count int64
@@ -56,8 +56,8 @@ func TestPoolShouldIncrementGettingFromChannel(t *testing.T) {
 			f(copyValToFunc)
 		})
 	}
-	pool.WaitWorkdersAndClose()
 	<-chFinished
+	pool.WaitWorkdersAndClose()
 	if count != expectedResult {
 		t.Fatalf("Expected %d, but receive %d", expectedResult, count)
 	}
@@ -112,7 +112,7 @@ func TestMustIncrementInBackgroundFunc(t *testing.T) {
 	}
 }
 
-func TestCallMustBeUntilLimit(t *testing.T) {
+func TestCallMustFillUntilLimit(t *testing.T) {
 	setup()
 	var size int64 = 4
 	var zero int64 = 0
