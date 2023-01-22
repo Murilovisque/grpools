@@ -4,6 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 var (
@@ -108,6 +109,30 @@ func TestMustIncrementInBackgroundFunc(t *testing.T) {
 	<-chFinished
 	if count != expectedResult {
 		t.Fatalf("Expected %d, but receive %d", expectedResult, count)
+	}
+}
+
+func TestCallMustBeUntilLimit(t *testing.T) {
+	setup()
+	var size int64 = 4
+	var zero int64 = 0
+	pool := NewPool(int(size))
+	var counter int64 = 0
+	funcao := func() {
+		time.Sleep(1 * time.Second)
+		atomic.AddInt64(&counter, 1)
+	}
+	if zero != pool.GetAmountWorkersProcessing() {
+		t.Fatalf("Expected %d, but received %d", zero, pool.GetAmountWorkersProcessing())
+	}
+	pool.CallWorker(funcao)
+	pool.CallWorkersUntilFill(funcao)
+	if size != pool.GetAmountWorkersProcessing() {
+		t.Fatalf("Expected %d, but received %d", zero, pool.GetAmountWorkersProcessing())
+	}
+	pool.WaitWorkdersAndClose()
+	if counter != size {
+		t.Fatalf("Expected %d, but received %d", size, counter)
 	}
 }
 

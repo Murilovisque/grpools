@@ -2,27 +2,35 @@ package grpools
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // NewPool returns a Pool
-func NewPool(qtdeGoroutines int) *Pool {
-	chWorkers, chFinished := goroutinesPool(qtdeGoroutines)
-	return &Pool{size: qtdeGoroutines, chWorkers: chWorkers, chFinished: chFinished}
+func NewPool(amountGoroutines int) *Pool {
+	p := Pool{}
+	p.initPool(amountGoroutines)
+	return &p
 }
 
 type Pool struct {
-	size       int
-	chWorkers  chan<- func()
-	chFinished <-chan int
+	size              int
+	chWorkers         chan<- func()
+	chFinished        <-chan int
+	workersProcessing int64
 }
 
 func (p *Pool) CallWorker(worker func()) {
 	p.chWorkers <- worker
+	atomic.AddInt64(&p.workersProcessing, 1)
 }
 
 func (p *Pool) CallWorkersUntilFill(worker func()) {
 	for i := 0; i < p.size; i++ {
+		if atomic.LoadInt64(&p.workersProcessing) >= int64(p.size) {
+			break
+		}
 		p.chWorkers <- worker
+		atomic.AddInt64(&p.workersProcessing, 1)
 	}
 }
 
@@ -40,15 +48,24 @@ func (p *Pool) WaitWorkdersAndClose() {
 	<-p.chFinished
 }
 
-func goroutinesPool(qtdeGoroutines int) (chan<- func(), <-chan int) {
+func (p *Pool) GetAmountWorkersProcessing() int64 {
+	return atomic.LoadInt64(&p.workersProcessing)
+}
+
+func (p *Pool) initPool(size int) {
 	chWorkers := make(chan func())
 	chFinished := make(chan int)
+	p.size = size
+	p.workersProcessing = 0
+	p.chWorkers = chWorkers
+	p.chFinished = chFinished
 	var wg sync.WaitGroup
-	wg.Add(qtdeGoroutines)
-	for i := 0; i < qtdeGoroutines; i++ {
+	wg.Add(p.size)
+	for i := 0; i < p.size; i++ {
 		go func() {
 			for work := range chWorkers {
 				work()
+				atomic.AddInt64(&p.workersProcessing, -1)
 			}
 			wg.Done()
 		}()
@@ -57,5 +74,4 @@ func goroutinesPool(qtdeGoroutines int) (chan<- func(), <-chan int) {
 		wg.Wait()
 		chFinished <- 1
 	}()
-	return chWorkers, chFinished
 }
